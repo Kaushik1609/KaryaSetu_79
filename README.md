@@ -4,6 +4,8 @@
 
 AI-based forecast bust detection platform that adds a reliability layer over medium-range rainfall forecasts. The system does NOT replace NWP forecasts — it predicts when forecasts may become unreliable.
 
+Prototype Link : https://karya-setu-forecast-reliability-int.vercel.app/
+
 ## Project Overview
 
 KaryaSetu detects rainfall forecast busts (large forecast errors) in medium-range weather forecasts (Day 1-Day 10). It uses a trained XGBoost classifier with sigmoid calibration to predict the probability that a rainfall forecast will have a large error. Every probability shown on screen is a real evaluation of that trained booster at the coordinate being displayed.
