@@ -59,7 +59,6 @@ export default function ForecastMap() {
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onExplain={() => {}}
-        onVerify={() => {}}
       />
     </div>
   );
