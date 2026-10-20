@@ -1,11 +1,17 @@
 import urllib.request
 import json
 
-try:
-    with urllib.request.urlopen("http://localhost:5173/", timeout=5) as resp:
-        print(f"Frontend Status: {resp.status} (Vite React UI is running)")
-except Exception as e:
-    print("Frontend error:", e)
+frontend_ok = False
+for url in ["http://localhost:5173/", "http://127.0.0.1:5173/", "http://[::1]:5173/"]:
+    try:
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            print(f"Frontend Status: {resp.status} (Vite React UI is running on {url})")
+            frontend_ok = True
+            break
+    except Exception:
+        continue
+if not frontend_ok:
+    print("Frontend error: Unable to connect on localhost, 127.0.0.1, or [::1]")
 
 try:
     with urllib.request.urlopen("http://localhost:8000/api/model-info") as resp:

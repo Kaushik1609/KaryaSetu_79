@@ -117,6 +117,9 @@ export interface ModelPerformance {
   precision?: number;
   recall?: number;
   f1?: number;
+  precision_optimal?: number;
+  recall_optimal?: number;
+  f1_optimal?: number;
   accuracy: number;
   brier_raw: number;
   brier_calibrated: number;

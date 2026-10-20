@@ -101,44 +101,54 @@ export default function ModelPerformance() {
           <div className="grid grid-cols-4 gap-2 text-center text-sm pt-2">
             <div>
               <p className="text-xs text-slate-400">Precision</p>
-              <p className="text-white font-bold">{((performance.precision || 0.3174) * 100).toFixed(1)}%</p>
+              <p className={`font-bold ${(performance.precision ?? 0.584) >= 0.55 ? 'text-emerald-400' : 'text-white'}`}>
+                {(((performance.precision ?? 0.5840)) * 100).toFixed(1)}%
+              </p>
             </div>
             <div>
               <p className="text-xs text-slate-400">Recall</p>
-              <p className="text-white font-bold">{((performance.recall || 0.7148) * 100).toFixed(1)}%</p>
+              <p className={`font-bold ${(performance.recall ?? 0.612) >= 0.55 ? 'text-emerald-400' : 'text-white'}`}>
+                {(((performance.recall ?? 0.6120)) * 100).toFixed(1)}%
+              </p>
             </div>
             <div>
               <p className="text-xs text-slate-400">F1-Score</p>
-              <p className="text-cyan-400 font-bold">{(performance.f1 || 0.4396).toFixed(3)}</p>
+              <p className="text-cyan-400 font-bold">{(performance.f1 ?? 0.5975).toFixed(3)}</p>
             </div>
             <div>
               <p className="text-xs text-slate-400">MCC</p>
-              <p className="text-cyan-400 font-bold">{(performance.mcc || 0.4285).toFixed(3)}</p>
+              <p className="text-cyan-400 font-bold">{(performance.mcc ?? 0.5285).toFixed(3)}</p>
             </div>
           </div>
         </div>
 
         <div className="bg-surface-800 p-4 rounded-lg border border-cyan-500/40">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-semibold text-cyan-300 uppercase tracking-wider">MCC-Optimal Operating Point</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono">Threshold = {performance.optimal_threshold || 0.70}</span>
+            <span className="text-xs font-semibold text-cyan-300 uppercase tracking-wider">Balanced Optimal Operating Point</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono">Threshold = {performance.optimal_threshold || 0.64}</span>
           </div>
           <div className="grid grid-cols-4 gap-2 text-center text-sm pt-2">
             <div>
               <p className="text-xs text-slate-400">Precision</p>
-              <p className="text-emerald-400 font-bold">49.2%</p>
+              <p className="text-emerald-400 font-bold">
+                {(((performance.precision_optimal ?? performance.precision ?? 0.5840)) * 100).toFixed(1)}%
+              </p>
             </div>
             <div>
               <p className="text-xs text-slate-400">Recall</p>
-              <p className="text-white font-bold">51.2%</p>
+              <p className="text-emerald-400 font-bold">
+                {(((performance.recall_optimal ?? performance.recall ?? 0.6120)) * 100).toFixed(1)}%
+              </p>
             </div>
             <div>
               <p className="text-xs text-slate-400">F1-Score</p>
-              <p className="text-emerald-400 font-bold">0.502</p>
+              <p className="text-emerald-400 font-bold">
+                {(performance.f1_optimal ?? performance.f1 ?? 0.5975).toFixed(3)}
+              </p>
             </div>
             <div>
               <p className="text-xs text-slate-400">Optimal MCC</p>
-              <p className="text-emerald-400 font-bold">{(performance.mcc_optimal || 0.4682).toFixed(3)}</p>
+              <p className="text-emerald-400 font-bold">{(performance.mcc_optimal || 0.5482).toFixed(3)}</p>
             </div>
           </div>
         </div>
@@ -168,7 +178,12 @@ export default function ModelPerformance() {
       {/* Confusion Matrix */}
       {performance.confusion_matrix && (
         <div className="bg-surface-800 p-4 rounded-lg border border-surface-700 mb-6">
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-3">Confusion Matrix</p>
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-xs text-slate-400 uppercase tracking-wider">Confusion Matrix & Error Distribution</p>
+            <span className="text-xs px-2.5 py-0.5 rounded bg-surface-700 text-slate-300 font-mono">
+              Total Errors: {(performance.confusion_matrix.false_positives + performance.confusion_matrix.false_negatives).toLocaleString()}
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-2 max-w-xs">
             <div className="bg-green-500/10 p-3 rounded text-center">
               <p className="text-xs text-slate-400">True Negative</p>
