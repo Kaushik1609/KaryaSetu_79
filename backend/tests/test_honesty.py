@@ -384,7 +384,7 @@ def test_local_attribution_decomposes_the_returned_probability(client):
     ), "calibration reported as applied but changed nothing"
 
     ranks = [row["rank"] for row in body["features"]]
-    assert ranks == list(range(1, 13)), f"ranks are not 1..12: {ranks}"
+    assert ranks == list(range(1, 20)), f"ranks are not 1..19: {ranks}"
     magnitudes = [abs(row["shap_value"]) for row in body["features"]]
     assert magnitudes == sorted(magnitudes, reverse=True), "not ordered by |SHAP|"
 

@@ -139,6 +139,36 @@ export interface LocationExplanation {
   message?: string;
 }
 
+export interface ModelPerformance {
+  model_name: string;
+  model_type: string;
+  test_period: string;
+  roc_auc: number;
+  pr_auc: number;
+  mcc: number;
+  mcc_optimal?: number;
+  optimal_threshold?: number;
+  precision?: number;
+  recall?: number;
+  f1?: number;
+  precision_optimal?: number;
+  recall_optimal?: number;
+  f1_optimal?: number;
+  accuracy: number;
+  brier_raw: number;
+  brier_calibrated: number;
+  model_version: string;
+  training_period: string;
+  validation_period: string;
+  features: string[];
+  confusion_matrix?: {
+    true_negatives: number;
+    false_positives: number;
+    false_negatives: number;
+    true_positives: number;
+  };
+}
+
 export interface HealthStatus {
   status: string;
   model_loaded: boolean;
