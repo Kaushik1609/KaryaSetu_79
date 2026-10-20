@@ -1,5 +1,11 @@
 """
-Verification and historical events endpoints.
+Verification and historical case endpoints.
+
+``/api/verification`` returns two clearly separated halves: ``model_skill``, the
+measured September 2019 held-out test-set figures transcribed from the training
+notebook, and ``archive``, the per-location forecast-versus-observation rows,
+which report ``available = false`` unless an archive file is attached. See
+:mod:`app.services.verification_service` for both record shapes.
 """
 
 from fastapi import APIRouter
@@ -11,8 +17,13 @@ router = APIRouter()
 @router.get("/api/verification")
 async def get_verification():
     """
-    Return verification data comparing forecast vs reference.
-    Currently returns not available since reference data is not connected.
+    Measured model skill, plus the forecast/observation archive when attached.
+
+    ``model_skill`` reports the tuned model's confusion matrix, discrimination
+    scores, calibration effect and threshold sweep on the September 2019 held-out
+    test set — a fixed historical evaluation, not live operational statistics.
+    ``archive`` returns an empty result set with ``available = false`` when no
+    verification archive is attached.
     """
     return verification_service.get_verification()
 
@@ -20,7 +31,9 @@ async def get_verification():
 @router.get("/api/historical-events")
 async def get_historical_events():
     """
-    Return historical verification events.
-    Currently returns empty since historical data is not available.
+    Return documented forecast bust cases.
+
+    Returns an empty result set with ``available = false`` when no case archive
+    is attached.
     """
     return verification_service.get_historical_events()

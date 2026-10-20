@@ -21,7 +21,7 @@ export const INDIAN_DISTRICTS: DistrictLocation[] = [
   { id: 'ludhiana', name: 'Ludhiana', state: 'Punjab', latitude: 30.9010, longitude: 75.8573, zone: 'North' },
   { id: 'chandigarh', name: 'Chandigarh', state: 'Chandigarh', latitude: 30.7333, longitude: 76.7794, zone: 'North' },
   { id: 'karnal', name: 'Karnal', state: 'Haryana', latitude: 29.6857, longitude: 76.9905, zone: 'North' },
-  { id: 'delhi', name: 'New Delhi (IMD HQ)', state: 'Delhi', latitude: 28.6139, longitude: 77.2090, zone: 'North' },
+  { id: 'delhi', name: 'New Delhi', state: 'Delhi', latitude: 28.6139, longitude: 77.2090, zone: 'North' },
   { id: 'gurugram', name: 'Gurugram', state: 'Haryana', latitude: 28.4595, longitude: 77.0266, zone: 'North' },
   { id: 'lucknow', name: 'Lucknow', state: 'Uttar Pradesh', latitude: 26.8467, longitude: 80.9462, zone: 'North' },
   { id: 'varanasi', name: 'Varanasi', state: 'Uttar Pradesh', latitude: 25.3176, longitude: 82.9739, zone: 'North' },
@@ -40,7 +40,7 @@ export const INDIAN_DISTRICTS: DistrictLocation[] = [
   { id: 'surat', name: 'Surat', state: 'Gujarat', latitude: 21.1702, longitude: 72.8311, zone: 'West' },
   { id: 'rajkot', name: 'Rajkot', state: 'Gujarat', latitude: 22.3039, longitude: 70.8022, zone: 'West' },
   { id: 'mumbai', name: 'Mumbai (Colaba / Santacruz)', state: 'Maharashtra', latitude: 19.0760, longitude: 72.8777, zone: 'West' },
-  { id: 'pune', name: 'Pune (IMD / IITM)', state: 'Maharashtra', latitude: 18.5204, longitude: 73.8567, zone: 'West' },
+  { id: 'pune', name: 'Pune (Shivajinagar)', state: 'Maharashtra', latitude: 18.5204, longitude: 73.8567, zone: 'West' },
   { id: 'nagpur', name: 'Nagpur', state: 'Maharashtra', latitude: 21.1458, longitude: 79.0882, zone: 'West' },
   { id: 'nashik', name: 'Nashik', state: 'Maharashtra', latitude: 19.9975, longitude: 73.7898, zone: 'West' },
   { id: 'panaji', name: 'Panaji', state: 'Goa', latitude: 15.4909, longitude: 73.8278, zone: 'West' },
@@ -87,77 +87,3 @@ export const INDIAN_DISTRICTS: DistrictLocation[] = [
   { id: 'port-blair', name: 'Port Blair', state: 'Andaman & Nicobar', latitude: 11.6234, longitude: 92.7265, zone: 'Islands' },
   { id: 'kavaratti', name: 'Kavaratti', state: 'Lakshadweep', latitude: 10.5669, longitude: 72.6420, zone: 'Islands' },
 ];
-
-/**
- * Spatial interpolation helper: Given any latitude & longitude in/near India,
- * calculates the interpolated bust probability & confidence score using
- * Inverse-Distance Weighting (IDW) from the trained grid points.
- */
-export function interpolateReliability(
-  lat: number,
-  lon: number,
-  points: { latitude: number; longitude: number; bust_probability: number; confidence: number; region?: string }[]
-) {
-  if (!points || points.length === 0) {
-    return { bust_probability: 0.12, confidence: 0.88, nearestRegion: 'Central India' };
-  }
-
-  // Find nearest district/station for semantic locality
-  let nearestDistrict = INDIAN_DISTRICTS[0];
-  let minDistrictDist = Infinity;
-  for (const d of INDIAN_DISTRICTS) {
-    const distSq = (lat - d.latitude) ** 2 + (lon - d.longitude) ** 2;
-    if (distSq < minDistrictDist) {
-      minDistrictDist = distSq;
-      nearestDistrict = d;
-    }
-  }
-
-  // IDW interpolation from 30 trained grid cells
-  let weightSum = 0;
-  let weightedBust = 0;
-  let weightedConf = 0;
-  let minGridDist = Infinity;
-  let nearestGrid = points[0];
-
-  for (const p of points) {
-    const dSq = (lat - p.latitude) ** 2 + (lon - p.longitude) ** 2;
-    if (dSq < minGridDist) {
-      minGridDist = dSq;
-      nearestGrid = p;
-    }
-
-    if (dSq < 0.001) {
-      // Exact hit on trained cell
-      return {
-        bust_probability: p.bust_probability,
-        confidence: p.confidence,
-        nearestRegion: `${nearestDistrict.name}, ${nearestDistrict.state}`,
-        sector: p.region || 'Trained Grid Point',
-        distanceKm: Math.round(Math.sqrt(minDistrictDist) * 111),
-      };
-    }
-
-    const weight = 1 / Math.pow(dSq, 1.2);
-    weightSum += weight;
-    weightedBust += p.bust_probability * weight;
-    weightedConf += p.confidence * weight;
-  }
-
-  const finalBust = weightSum > 0 ? weightedBust / weightSum : nearestGrid.bust_probability;
-  const finalConf = weightSum > 0 ? weightedConf / weightSum : nearestGrid.confidence;
-
-  const districtDistKm = Math.round(Math.sqrt(minDistrictDist) * 111);
-  const locationLabel =
-    districtDistKm < 60
-      ? `${nearestDistrict.name} District, ${nearestDistrict.state}`
-      : `${nearestDistrict.name} Vicinity (${nearestDistrict.state})`;
-
-  return {
-    bust_probability: Math.min(0.99, Math.max(0.01, finalBust)),
-    confidence: Math.min(0.99, Math.max(0.01, finalConf)),
-    nearestRegion: locationLabel,
-    sector: nearestGrid.region || 'Regional Sector',
-    distanceKm: districtDistKm,
-  };
-}

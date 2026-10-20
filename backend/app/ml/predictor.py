@@ -5,12 +5,12 @@ Predictor — Runs inference using the trained XGBoost model and calibrator.
 import logging
 import math
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 
 import numpy as np
 
 from .model_loader import model_loader
-from .feature_schema import FEATURE_COLUMNS, lead_hours_to_day
+from .feature_schema import FEATURE_COLUMNS, FEATURE_SCHEMA, lead_hours_to_day
 
 logger = logging.getLogger("karyasetu")
 
@@ -38,7 +38,7 @@ class Predictor:
         Run prediction on a single set of features.
 
         Args:
-            features: Dictionary with all 11 model features
+            features: Dictionary with all model features
 
         Returns:
             Dictionary with bust_probability, confidence, confidence_level, etc.
@@ -55,7 +55,7 @@ class Predictor:
         feature_vector = self._extract_features(features)
 
         # Run XGBoost inference
-        X = np.array([feature_vector])
+        X = np.array([feature_vector], dtype=float)
         raw_prob = float(self.model.predict_proba(X)[0, 1])
 
         # Apply calibration if available
@@ -69,20 +69,29 @@ class Predictor:
         confidence = 1.0 - calibrated_prob
         confidence_level = self._confidence_level(confidence)
 
-        # Derive day from lead hours
-        lead_hours = feature_vector[10]  # lead_hours is the 11th feature
+        lead_index = FEATURE_COLUMNS.index("lead_hours")
+        lead_hours = feature_vector[lead_index]
         day = lead_hours_to_day(lead_hours)
-        bust_sim = feature_vector[11] if len(feature_vector) > 11 else None
+
+        sim_index = FEATURE_COLUMNS.index("bust_pattern_similarity")
+        bust_sim = feature_vector[sim_index]
+
+        lat_index = FEATURE_COLUMNS.index("latitude")
+        lon_index = FEATURE_COLUMNS.index("longitude")
+        lat = feature_vector[lat_index]
+        lon = feature_vector[lon_index]
 
         return {
             "bust_probability": round(calibrated_prob, 4),
+            "uncalibrated_probability": round(raw_prob, 6),
+            "calibration_applied": self.calibration_loaded,
             "confidence": round(confidence, 4),
             "confidence_level": confidence_level,
             "day": day,
             "lead_hours": lead_hours,
-            "latitude": feature_vector[9],
-            "longitude": feature_vector[8],
-            "bust_pattern_similarity": round(bust_sim, 4) if bust_sim is not None else None,
+            "latitude": lat,
+            "longitude": lon,
+            "bust_pattern_similarity": round(bust_sim, 4),
             "model_version": self.model_version,
             "request_id": request_id,
         }
@@ -99,6 +108,61 @@ class Predictor:
                 results.append({"error": str(e)})
         return results
 
+    def predict_matrix(self, feature_rows: List[List[float]]) -> List[Dict[str, Any]]:
+        """
+        Score many feature vectors with two booster calls instead of two per row.
+        """
+        if not self.model_loaded:
+            raise ValueError("Model is not loaded. Cannot run prediction.")
+
+        if not feature_rows:
+            return []
+
+        width = len(FEATURE_COLUMNS)
+        for index, row in enumerate(feature_rows):
+            if len(row) != width:
+                raise ValueError(
+                    f"Row {index} has {len(row)} features, expected {width}"
+                )
+            for value in row:
+                if math.isnan(value) or math.isinf(value):
+                    raise ValueError(f"Row {index} contains a non-finite value")
+
+        X = np.asarray(feature_rows, dtype=float)
+        raw_probs = self.model.predict_proba(X)[:, 1]
+        if self.calibration_loaded:
+            calibrated_probs = self.calibrator.predict_proba(X)[:, 1]
+        else:
+            calibrated_probs = raw_probs
+
+        request_id = str(uuid.uuid4())[:8]
+        lon_index = FEATURE_COLUMNS.index("longitude")
+        lat_index = FEATURE_COLUMNS.index("latitude")
+        lead_index = FEATURE_COLUMNS.index("lead_hours")
+        similarity_index = FEATURE_COLUMNS.index("bust_pattern_similarity")
+
+        results: List[Dict[str, Any]] = []
+        for i, row in enumerate(feature_rows):
+            calibrated_prob = float(calibrated_probs[i])
+            confidence = 1.0 - calibrated_prob
+            results.append(
+                {
+                    "bust_probability": round(calibrated_prob, 4),
+                    "uncalibrated_probability": round(float(raw_probs[i]), 6),
+                    "calibration_applied": self.calibration_loaded,
+                    "confidence": round(confidence, 4),
+                    "confidence_level": self._confidence_level(confidence),
+                    "day": lead_hours_to_day(row[lead_index]),
+                    "lead_hours": row[lead_index],
+                    "latitude": row[lat_index],
+                    "longitude": row[lon_index],
+                    "bust_pattern_similarity": round(row[similarity_index], 4),
+                    "model_version": self.model_version,
+                    "request_id": request_id,
+                }
+            )
+        return results
+
     # Mapping from API schema names to model feature names
     FEATURE_NAME_MAP = {
         "temperature_2m": "2m_temperature",
@@ -110,6 +174,8 @@ class Predictor:
     def _extract_features(self, features: Dict[str, Any]) -> list:
         """Extract and validate features in the correct order."""
         feature_vector = []
+        lead_hours = features.get("lead_hours", 24.0)
+
         for col in FEATURE_COLUMNS:
             # Try direct name first, then mapped name
             val = features.get(col)
@@ -119,14 +185,17 @@ class Predictor:
                     if model_name == col and api_name in features:
                         val = features[api_name]
                         break
-            if val is None:
-                if col == "bust_pattern_similarity":
-                    # Derive default similarity from precipitation intensity & lead time if omitted
-                    tp = float(features.get("total_precipitation_24hr", features.get("precipitation", 0.01)))
-                    lead_h = float(features.get("lead_hours", 24.0))
-                    val = float(np.clip(0.42 + min(0.40, tp * 12.0) + (lead_h / 240.0) * 0.12, 0.0, 1.0))
+
+            # If not provided, fallback to domain default from FEATURE_SCHEMA
+            if val is None and col in FEATURE_SCHEMA:
+                if "tendency" in col and lead_hours <= 24.0:
+                    val = 0.0
                 else:
-                    raise ValueError(f"Missing feature: {col}")
+                    val = FEATURE_SCHEMA[col].get("default", 0.0)
+
+            if val is None:
+                raise ValueError(f"Missing feature: {col}")
+
             val = float(val)
             if math.isnan(val) or math.isinf(val):
                 raise ValueError(f"Invalid value for {col}: {val}")
